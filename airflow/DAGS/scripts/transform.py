@@ -7,7 +7,7 @@ BASE_DIR = Path(os.getenv("AIRFLOW_HOME", Path(__file__).parent.parent))
 def transform_to_star_schema() -> str:
     input_file   = BASE_DIR / "data" / "processed" / "meteo_global.csv"
     output_dir   = BASE_DIR / "data" / "star_schema"
-    city_dim_path = output_dir / "dim_ville.csv"
+    city_dim_path = output_dir / "dim_city.csv"
     fact_path     = output_dir / "fact_weather.csv"
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -18,17 +18,17 @@ def transform_to_star_schema() -> str:
     if city_dim_path.exists():
         city_dim = pd.read_csv(city_dim_path)
     else:
-        city_dim = pd.DataFrame(columns=["ville_id", "ville"])
+        city_dim = pd.DataFrame(columns=["city_id", "city"])
 
-    nouvelles_villes = set(weather_data["ville"]) - set(city_dim["ville"])
-    if nouvelles_villes:
-        next_id = (city_dim["ville_id"].max() + 1) if not city_dim.empty else 1
+    new_city = set(weather_data["city"]) - set(city_dim["city"])
+    if new_city:
+        next_id = (city_dim["city_id"].max() + 1) if not city_dim.empty else 1
         city_dim = pd.concat(
             [
                 city_dim,
                 pd.DataFrame(
-                    {"ville_id": range(next_id, next_id + len(nouvelles_villes)),
-                     "ville": list(nouvelles_villes)}
+                    {"city_id": range(next_id, next_id + len(new_city)),
+                     "city": list(new_city)}
                 ),
             ],
             ignore_index=True,
@@ -36,13 +36,13 @@ def transform_to_star_schema() -> str:
         city_dim.to_csv(city_dim_path, index=False)
 
     # -------- fact: fact_weather -------------------------------------------
-    faits_meteo = (
+    fact_weather = (
         weather_data
-        .merge(city_dim, on="ville", how="left")
-        .drop(columns=["ville"])
+        .merge(city_dim, on="city", how="left")
+        .drop(columns=["city"])
     )
 
         
-    faits_meteo.to_csv(fact_path, index=False)
+    fact_weather.to_csv(fact_path, index=False)
 
     return str(fact_path)   
