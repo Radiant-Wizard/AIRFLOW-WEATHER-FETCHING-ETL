@@ -54,10 +54,11 @@ def merge_data(date: str) -> str:
     if not new_data:
         raise ValueError(f"No new data to fuse for {date}")
 
-    updated_df = pd.concat([global_df] + new_data, ignore_index=True)
-    updated_df = _clean_df(updated_df)
+    # cleaning
+    update_global_df = pd.concat([global_df] + new_data, ignore_index=True)
+    cleaned_updated_df = _clean_df(update_global_df)
     
     
 
-    updated_df.to_csv(output_file, index=False)
+    cleaned_updated_df.to_csv(output_file, index=False)
     return str(output_file)
