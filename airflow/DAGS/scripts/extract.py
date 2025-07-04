@@ -16,11 +16,13 @@ def extract_forecast_data(city: str, api_key: str, date: str) -> bool:
     data = resp.json()
     record = {
         "city":          city,
-        "date": datetime.now().strftime("%y-%m-%d"),
+        "extraction_date": datetime.now().strftime("%y-%m-%d"),
         "temperature":    data["main"]["temp"],
         "humidite":       data["main"]["humidity"],
         "pluie_mm": data.get("rain", {}).get("1h", 0),
         "meteo": data["weather"][0]["main"],
+        "temp_min":     data["main"]["temp_min"],
+        "temp_max":     data["main"]["temp_max"],
     }
 
     # data path
