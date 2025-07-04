@@ -2,7 +2,33 @@ import pandas as pd
 from pathlib import Path
 import os
 
+def _clean_df(df : pd.DataFrame ) -> pd.DataFrame:
+    df.columns = (
+        df.columns.str.strip().str.lower().str.replace(" ", "_") 
+    )
+    
+    if "meteo" in df.columns:
+        df["meteo"] = (
+            df["meteo"]
+            .astype(str)
+            .str.lower()
+            .str.strip()
+            .str.replace(" ", "_")
+        )
+    
+    if "extraction_date" in df.columns:
+        df["extraction_date"] = pd.to_datetime(
+            df["extraction_date"], errors="coerce", utc=True
+        )
 
+    # Make sheet not turning the float into date
+    float_col = df.select_dtypes("float").columns
+    df[float_col] = df[float_col].round(2)
+    
+    # Remove duplicates
+    df = df.drop_duplicates(subset=["extraction_date", "city"], keep="last")
+    
+    return df
 def merge_data(date: str) -> str:
     # Relative path from $AIRFLOW_HOME
     base_dir = Path(os.getenv('AIRFLOW_HOME', Path(__file__).parent.parent))
@@ -29,10 +55,9 @@ def merge_data(date: str) -> str:
         raise ValueError(f"No new data to fuse for {date}")
 
     updated_df = pd.concat([global_df] + new_data, ignore_index=True)
-    updated_df = updated_df.drop_duplicates(
-        subset=["ville", "date_extraction"],
-        keep="last"
-    )
+    updated_df = _clean_df(updated_df)
+    
+    
 
     updated_df.to_csv(output_file, index=False)
     return str(output_file)
