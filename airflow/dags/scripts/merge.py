@@ -30,35 +30,43 @@ def _clean_df(df : pd.DataFrame ) -> pd.DataFrame:
     
     return df
 def merge_data(date: str) -> str:
-    # Relative path from $AIRFLOW_HOME
     base_dir = Path(os.getenv('AIRFLOW_HOME', Path(__file__).parent.parent))
     input_dir = base_dir / "data" / "raw" / date
     output_file = base_dir / "data" / "processed" / "meteo_global.csv"
 
-    # Checking if input_dir exists
     if not input_dir.exists():
         raise FileNotFoundError(f"Input folder not found: {input_dir}")
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Read or initialise input dir
-    global_df = pd.read_csv(output_file) if output_file.exists() else pd.DataFrame()
+    if output_file.exists():
+        global_df = pd.read_csv(
+            output_file,
+            parse_dates=["extraction_date"],
+            date_format="ISO8601"
+        )
+    else:
+        global_df = pd.DataFrame()
 
-    # Concatenate raw data 
-    new_data = [
-        pd.read_csv(file)
-        for file in input_dir.iterdir()
-        if file.name.startswith("meteo_") and file.name.endswith(".csv")
-    ]
+    new_data = []
+    for file in input_dir.iterdir():
+        if file.name.startswith("meteo_") and file.name.endswith(".csv"):
+            df = pd.read_csv(
+                file,
+                parse_dates=["extraction_date"],
+                date_format="ISO8601"
+            )
+            new_data.append(df)
 
     if not new_data:
-        raise ValueError(f"No new data to fuse for {date}")
+        raise ValueError(f"No new data to merge for {date}")
 
-    # cleaning
-    update_global_df = pd.concat([global_df] + new_data, ignore_index=True)
-    cleaned_updated_df = _clean_df(update_global_df)
+    merged_df = pd.concat([global_df] + new_data, ignore_index=True)
+    cleaned_df = _clean_df(merged_df)
     
-    
-
-    cleaned_updated_df.to_csv(output_file, index=False)
-    return str(output_file)
+    cleaned_df.to_csv(
+        output_file, 
+        index=False,
+        date_format="%Y-%m-%d %H:%M:%S.%f"  # Preserve microsecond precision
+    )
+    return str(output_file)   
