@@ -34,11 +34,22 @@ def merge_data():
     
     base_dir = Path(os.getenv('AIRFLOW_HOME', Path(__file__).parent.parent))
     raw_dir = base_dir / "historical-data" / "raw"
-    processed_dir = base_dir / "historical-data" / "processed"
+    processed_dir = base_dir / "data" / "processed"
     output_file = processed_dir / "meteo_global.csv"
     processed_dir.mkdir(parents=True, exist_ok=True)
     
+    if not raw_dir.exists():
+        raise FileNotFoundError(f"Input folder not found: {raw_dir}")
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
     global_df = pd.DataFrame()
+    if output_file.exists() and output_file.stat().st_size > 0:
+        try:
+            global_df = pd.read_csv(output_file)
+        except:
+            print(f"Warning: Could not read existing output file {output_file}")
+            global_df = pd.DataFrame()
     try:
         raw_dirs = [d for d in raw_dir.iterdir() if d.is_dir()]
     except:
