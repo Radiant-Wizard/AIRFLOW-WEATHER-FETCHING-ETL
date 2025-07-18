@@ -15,20 +15,56 @@ def _clean_df(df : pd.DataFrame ) -> pd.DataFrame:
             .str.strip()
             .str.replace(" ", "_")
         )
+    numeric_cols = [
+        'temperature','humidite','pluie_mm','meteo','temp_min','temp_max'
+    ]
     
+    numeric_cols = [
+        col for col in df.columns 
+        if any(pattern in col.lower() for pattern in numeric_cols)
+        and df[col].dtype == object
+    ]
+    
+    
+    # Clean extraction_date
     if "extraction_date" in df.columns:
+        # Convert to datetime (timezone-naive)
         df["extraction_date"] = pd.to_datetime(
-            df["extraction_date"], errors="coerce", utc=True
+            df["extraction_date"],
+            errors='coerce',
+            dayfirst=True,
+            format='mixed'
         )
-
+        
+        # Handle remaining NaT values
+        na_mask = df["extraction_date"].isna()
+        if na_mask.any():
+            df.loc[na_mask, "extraction_date"] = pd.to_datetime(
+                df.loc[na_mask, "extraction_date"],
+                errors='coerce',
+                format='ISO8601'
+            )
+        
+        # Normalize to date and ensure timezone-naive
+        df["extraction_date"] = df["extraction_date"].dt.tz_localize(None).dt.normalize()
+        
     # Make sheet not turning the float into date
-    float_col = df.select_dtypes("float").columns
-    df[float_col] = df[float_col].round(2)
-    
-    # Remove duplicates
-    df = df.drop_duplicates(subset=["extraction_date", "city"], keep="last", ignore_index=True)
-    
+    for col in numeric_cols:
+        # Remove non-numeric characters (keep digits, decimal points, and negative signs)
+        df[col] = df[col].astype(str).str.replace(r'[^\d.-]', '', regex=True)
+        
+        # Replace commas with dots for European decimal format
+        df[col] = df[col].str.replace('.', ',', regex=False)
+        
+        # Convert to numeric, coercing errors to NaN
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Round to 2 decimal places if it's a float column
+        if pd.api.types.is_float_dtype(df[col]):
+            df[col] = df[col].round(2)
+ 
     return df
+
 def merge_data():
     # Relative path from $AIRFLOW_HOME
     
@@ -57,7 +93,7 @@ def merge_data():
     
     for dir in raw_dirs:
         files = dir.glob("meteo_*.csv")
-        
+        print(dir.name)
         if not files:
             print(f"No csv in {dir}")
             continue
@@ -69,9 +105,7 @@ def merge_data():
     if global_df.empty:
         raise ValueError("No data in all the csv")
     
-    cleaned_df = _clean_df(global_df)
-    
-    cleaned_df.to_csv(output_file, index=False)
+    global_df.to_csv(output_file, index=False)
 
 if __name__ == "__main__":
     merge_data()
